@@ -1,32 +1,12 @@
-const CACHE_NAME = "gyeongjeongapp-v2";
-const CORE_ASSETS = ["./", "./index.html", "./bundle.js", "./styles.css", "./manifest.json"];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
-  );
-  self.skipWaiting();
-});
-
+// 서비스워커 캐시 문제(배포한 새 코드가 계속 가려지는 문제)로 인해 이 앱은 서비스워커를 쓰지 않기로 했다.
+// 혹시 예전에 설치된 서비스워커가 남아있는 브라우저를 위해, 뜨자마자 스스로를 해제하고 캐시를 비운다.
+self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
-
-// 네트워크 우선: 항상 최신 배포본을 먼저 시도하고, 오프라인일 때만 캐시로 대체한다.
-// (개발 중 배포한 새 코드가 옛 캐시에 가려 반영 안 되는 문제를 막기 위함)
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      .then(() => self.registration.unregister())
+      .then(() => self.clients.matchAll())
+      .then((clients) => clients.forEach((c) => c.navigate(c.url)))
   );
 });
